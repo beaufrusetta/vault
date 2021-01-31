@@ -145,6 +145,20 @@ func (b *SystemBackend) raftStoragePaths() []*framework.Path {
 			HelpSynopsis:    strings.TrimSpace(sysRaftHelp["raft-snapshot-force"][0]),
 			HelpDescription: strings.TrimSpace(sysRaftHelp["raft-snapshot-force"][1]),
 		},
+		{
+			Pattern: "storage/raft/autopilot/configuration",
+			Operations: map[logical.Operation]framework.OperationHandler{
+				logical.ReadOperation: &framework.PathOperation{
+					Callback: b.handleStorageRaftAutopilotConfigRead(),
+				},
+				logical.UpdateOperation: &framework.PathOperation{
+					Callback: b.handleStorageRaftAutopilotConfigUpdate(),
+				},
+			},
+
+			HelpSynopsis:    strings.TrimSpace(sysRaftHelp["raft-snapshot-force"][0]),
+			HelpDescription: strings.TrimSpace(sysRaftHelp["raft-snapshot-force"][1]),
+		},
 	}
 }
 
@@ -331,6 +345,37 @@ func (b *SystemBackend) handleStorageRaftSnapshotRead() framework.OperationFunc 
 			return nil, err
 		}
 
+		return nil, nil
+	}
+}
+
+func (b *SystemBackend) handleStorageRaftAutopilotConfigRead() framework.OperationFunc {
+	return func(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+		raftStorage, ok := b.Core.underlyingPhysical.(*raft.RaftBackend)
+		if !ok {
+			return logical.ErrorResponse("raft storage is not in use"), logical.ErrInvalidRequest
+		}
+		config, err := raftStorage.AutopilotConf()
+		if err != nil {
+			return nil, err
+		}
+		if config == nil {
+			return nil, nil
+		}
+		return &logical.Response{
+			Data: map[string]interface{}{
+				"cleanup_dead_servers":      config.CleanupDeadServers,
+				"last_contact_threshold":    config.LastContactThreshold.String(),
+				"max_training_logs":         config.MaxTrailingLogs,
+				"min_quorum":                config.MinQuorum,
+				"server_stabilization_time": config.ServerStabilizationTime.String(),
+			},
+		}, nil
+	}
+}
+
+func (b *SystemBackend) handleStorageRaftAutopilotConfigUpdate() framework.OperationFunc {
+	return func(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 		return nil, nil
 	}
 }
